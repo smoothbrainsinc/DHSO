@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Search Widget</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 0 20px; }
+        input[type="text"], textarea, select { width: 100%; padding: 5px; margin-bottom: 10px; }
+        #preview { background-color: #f0f0f0; padding: 10px; border-radius: 5px; white-space: pre-wrap; }
+        #savedParams { margin-top: 10px; }
+        .saved-param { background-color: #e0e0e0; padding: 5px; margin: 2px; display: inline-block; border-radius: 3px; }
+        .radio-group, .checkbox-group { margin-bottom: 10px; }
+        .radio-group label, .checkbox-group label { margin-right: 10px; }
+        .search-container { position: relative; display: inline-block; width: 100%; }
+        #clearSearch { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; display: none; }
+        #searchEngineContainer { display: flex; align-items: center; margin-bottom: 10px; }
+        #searchEngine { flex-grow: 1; margin-right: 10px; }
+        #removeEngine { margin-right: 10px; }
+    </style>
+</head>
+<body>
+    <h2>Custom Search Widget</h2>
+    <form id="searchForm">
+        <div id="searchEngineContainer">
+            <select id="searchEngine">
+                <option value="https://www.google.com/search?">Google</option>
+                <option value="https://www.bing.com/search?">Bing</option>
+                <option value="https://duckduckgo.com/?">DuckDuckGo</option>
+            </select>
+            <button type="button" id="removeEngine" style="display: none;">Remove Engine</button>
+        </div>
+        <button type="button" id="addEngine">Add New Engine</button>
+        <div class="search-container">
+            <input type="text" id="searchQuery" placeholder="Enter your search query" required>
+            <button type="button" id="clearSearch" aria-label="Clear search">✖</button>
+        </div>
+        <div class="radio-group">
+            <label><input type="radio" name="dateRange" value="1m"> 1 Month</label>
+            <label><input type="radio" name="dateRange" value="6m"> 6 Months</label>
+            <label><input type="radio" name="dateRange" value="1y"> 1 Year</label>
+        </div>
+        <div class="checkbox-group">
+            <label><input type="checkbox" id="safeSearchOff"> Turn SafeSearch Off</label>
+        </div>
+        <textarea id="additionalParams" rows="3" placeholder="Add additional search parameters (one per line)"></textarea>
+        <input type="submit" value="Search">
+    </form>
+    <h3>Search Preview:</h3>
+    <div id="preview"></div>
+    <h3>Saved Parameters:</h3>
+    <div id="savedParams"></div>
+
+    <script>
+        const searchForm = document.getElementById('searchForm');
+        const searchEngineContainer = document.getElementById('searchEngineContainer');
+        const searchEngine = document.getElementById('searchEngine');
+        const addEngineButton = document.getElementById('addEngine');
+        const removeEngineButton = document.getElementById('removeEngine');
+        const searchQuery = document.getElementById('searchQuery');
+        const clearSearchButton = document.getElementById('clearSearch');
+        const additionalParams = document.getElementById('additionalParams');
+        const preview = document.getElementById('preview');
+        const savedParams = document.getElementById('savedParams');
+        const dateRangeRadios = document.getElementsByName('dateRange');
+        const safeSearchOff = document.getElementById('safeSearchOff');
+
+        // Load saved data
+        if (localStorage.getItem('searchEngines')) {
+            const savedEngines = JSON.parse(localStorage.getItem('searchEngines'));
+            savedEngines.forEach(engine => {
+                if (!Array.from(searchEngine.options).some(option => option.value === engine.url)) {
+                    const option = new Option(engine.name, engine.url);
+                    option.classList.add('custom-engine');
+                    searchEngine.add(option);
+                }
+            });
+        }
+        if (localStorage.getItem('selectedEngine')) {
+            searchEngine.value = localStorage.getItem('selectedEngine');
+        }
+        if (localStorage.getItem('additionalParams')) {
+            additionalParams.value = localStorage.getItem('additionalParams');
+        }
+        if (localStorage.getItem('dateRange')) {
+            const savedDateRange = localStorage.getItem('dateRange');
+            dateRangeRadios.forEach(radio => {
+                if (radio.value === savedDateRange) {
+                    radio.checked = true;
+                }
+            });
+        }
+        if (localStorage.getItem('safeSearchOff')) {
+            safeSearchOff.checked = localStorage.getItem('safeSearchOff') === 'true';
+        }
+        updateSavedParams();
+
+        function updatePreview() {
+            let baseUrl = searchEngine.value;
+            let params = new URLSearchParams({q: searchQuery.value});
+
+            const selectedDateRange = document.querySelector('input[name="dateRange"]:checked');
+            if (selectedDateRange) {
+                params.append('as_qdr', selectedDateRange.value);
+            }
+
+            if (safeSearchOff.checked) {
+                if (baseUrl.includes('google.com')) {
+                    params.append('safe', 'off');
+                } else if (baseUrl.includes('bing.com')) {
+                    params.append('adlt', 'off');
+                } else if (baseUrl.includes('duckduckgo.com')) {
+                    params.append('kp', '-2');
+                }
+            }
+
+            let additionalParamsArray = additionalParams.value.split('\n').filter(param => param.trim() !== '');
+            additionalParamsArray.forEach(param => {
+                params.append('q', param.trim());
+            });
+
+            preview.textContent = baseUrl + params.toString();
+        }
+
+        function updateSavedParams() {
+            let params = additionalParams.value.split('\n').filter(param => param.trim() !== '');
+            savedParams.innerHTML = params.map(param => `<span class="saved-param">${param}</span>`).join(' ');
+        }
+
+        function updateRemoveButton() {
+            const selectedOption = searchEngine.options[searchEngine.selectedIndex];
+            removeEngineButton.style.display = selectedOption.classList.contains('custom-engine') ? 'inline-block' : 'none';
+        }
+
+        searchEngine.addEventListener('change', () => {
+            localStorage.setItem('selectedEngine', searchEngine.value);
+            updatePreview();
+            updateRemoveButton();
+        });
+
+        addEngineButton.addEventListener('click', () => {
+            const name = prompt("Enter the name of the search engine:");
+            const url = prompt("Enter the search URL (including '?' at the end):");
+            if (name && url) {
+                const option = new Option(name, url);
+                option.classList.add('custom-engine');
+                searchEngine.add(option);
+                searchEngine.value = url;
+                
+                const savedEngines = JSON.parse(localStorage.getItem('searchEngines') || '[]');
+                savedEngines.push({name, url});
+                localStorage.setItem('searchEngines', JSON.stringify(savedEngines));
+                
+                updateRemoveButton();
+                updatePreview();
+            }
+        });
+
+        removeEngineButton.addEventListener('click', () => {
+            const selectedOption = searchEngine.options[searchEngine.selectedIndex];
+            if (selectedOption.classList.contains('custom-engine')) {
+                searchEngine.remove(searchEngine.selectedIndex);
+                
+                const savedEngines = JSON.parse(localStorage.getItem('searchEngines') || '[]');
+                const updatedEngines = savedEngines.filter(engine => engine.url !== selectedOption.value);
+                localStorage.setItem('searchEngines', JSON.stringify(updatedEngines));
+                
+                updateRemoveButton();
+                updatePreview();
+            }
+        });
+
+        searchQuery.addEventListener('input', () => {
+            updatePreview();
+            clearSearchButton.style.display = searchQuery.value ? 'block' : 'none';
+        });
+
+        clearSearchButton.addEventListener('click', () => {
+            searchQuery.value = '';
+            updatePreview();
+            clearSearchButton.style.display = 'none';
+        });
+
+        additionalParams.addEventListener('input', () => {
+            localStorage.setItem('additionalParams', additionalParams.value);
+            updatePreview();
+            updateSavedParams();
+        });
+
+        dateRangeRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                localStorage.setItem('dateRange', radio.value);
+                updatePreview();
+            });
+        });
+
+        safeSearchOff.addEventListener('change', () => {
+            localStorage.setItem('safeSearchOff', safeSearchOff.checked);
+            updatePreview();
+        });
+
+        searchForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            let finalUrl = preview.textContent;
+            window.open(finalUrl, '_blank');
+        });
+
+        updatePreview();
+        updateRemoveButton();
+    </script>
+</body>
+</html>
+
