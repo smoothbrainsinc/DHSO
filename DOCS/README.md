@@ -1,4 +1,4 @@
-# Custom Search Widget
+# Never Obsolete Search Engine
 
 ## Description
 
@@ -6,7 +6,7 @@ The Custom Search Widget is a versatile and user-friendly web application that a
 
 ## Features
 
-- Support for multiple search engines (Google, Bing, DuckDuckGo, Presearch)
+- Support for multiple search engines (Google, Bing, DuckDuckGo)
 - Ability to add custom search engines
 - Date range filtering
 - SafeSearch toggle
